@@ -312,6 +312,10 @@ function pickVoice(){
 if('speechSynthesis' in window){
   speechSynthesis.onvoiceschanged = pickVoice;
   pickVoice();
+  /* iOS/Safari has a known bug where the speech queue silently pauses itself
+     during a session; periodically nudging resume() keeps the guiding voice
+     working throughout use, not just on the first screen. */
+  setInterval(()=>{ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }, 4000);
 }
 function speak(text){
   return new Promise(resolve=>{
@@ -1186,7 +1190,33 @@ async function finishStagePractice(domain, idx){
 }
 
 /* ============ INIT ============ */
-goHome();
+let audioUnlocked = false;
+function renderStart(){
+  app.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:82vh;text-align:center;gap:18px;">
+      <div class="mascot" style="font-size:80px;">🦉</div>
+      <div class="home-title">לומדים עם חוכמה</div>
+      <div class="home-sub">קריאה • כתיבה • חשבון</div>
+      <button class="btn primary" style="max-width:280px;font-size:20px;padding:20px 24px" onclick="unlockAndStart()">🔊 לחצי כדי להתחיל</button>
+      <div style="color:#8A83A0;font-size:14px;max-width:280px">הלחיצה מפעילה גם את הקול המנחה של האפליקציה בטלפון</div>
+    </div>`;
+}
+function unlockAndStart(){
+  audioUnlocked = true;
+  /* This call happens directly inside a real tap, which is what mobile
+     browsers require in order to allow the app to use voice at all
+     afterward - including narration triggered later without a fresh tap. */
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance('שלום! אני חוכמה הינשופה');
+    u.lang='he-IL';
+    if(heVoice) u.voice = heVoice;
+    u.rate = 0.92; u.pitch = 1.2;
+    speechSynthesis.speak(u);
+  }catch(e){}
+  goHome();
+}
+renderStart();
 </script>
 </body>
 </html>
